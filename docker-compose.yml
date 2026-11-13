@@ -1,0 +1,57 @@
+services:
+  web:
+    build: .
+    container_name: cloud_web
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: db
+      DB_USER: cloud_user
+      DB_PASSWORD: cloud_pass
+      DB_NAME: cloud
+    volumes:
+      - web_data:/var/www/html/uploads
+    networks:
+      - cloud_app_net
+      - cloud_db_net
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: mariadb:11.4
+    container_name: cloud_db
+    environment:
+      MARIADB_DATABASE: cloud
+      MARIADB_USER: cloud_user
+      MARIADB_PASSWORD: cloud_pass
+      MARIADB_ROOT_PASSWORD: root_pass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - cloud_db_net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  db_data:
+    driver: local
+  web_data:
+    driver: local
+
+networks:
+  cloud_app_net:
+    driver: bridge
+  cloud_db_net:
+    driver: bridge
